@@ -513,7 +513,7 @@ namespace Robots
 			s_inv_pm_dot_v3(directionPm, originPee_B + i, originPee + i);
 		}
 
-		double dPee[18],dPee_R[18];
+		double dPee[18];
 		/*设置移动腿，以下在以身体为起点的地面坐标系中规划,之规划相对移动方向和位置*/
 		for (int i = 3; i < 18; i += 6)
 		{
@@ -842,11 +842,58 @@ namespace Robots
 
 		return 2 * pWP->n * pWP->totalCount - pWP->count - 1;
 	}
+	Aris::Core::MSG parseWalk(const std::string &cmd, const std::map<std::string, std::string> &params)
+	{
+		Robots::WALK_PARAM  param;
+
+		for (auto &i : params)
+		{
+			if (i.first == "totalCount")
+			{
+				param.totalCount = std::stoi(i.second);
+			}
+			else if (i.first == "n")
+			{
+				param.n = stoi(i.second);
+			}
+			else if (i.first == "walkDirection")
+			{
+				param.walkDirection = stoi(i.second);
+			}
+			else if (i.first == "upDirection")
+			{
+				param.upDirection = stoi(i.second);
+			}
+			else if (i.first == "distance")
+			{
+				param.d = stod(i.second);
+			}
+			else if (i.first == "height")
+			{
+				param.h = stod(i.second);
+			}
+			else if (i.first == "alpha")
+			{
+				param.alpha = stod(i.second);
+			}
+			else if (i.first == "beta")
+			{
+				param.beta = stod(i.second);
+			}
+		}
+
+		Aris::Core::MSG msg;
+
+		msg.CopyStruct(param);
+
+		return msg;
+	}
+
 	int adjust(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam)
 	{
 		auto pAP = static_cast<const ADJUST_PARAM*>(pParam);
 
-		int pos, periodBeginCount{ 0 }, periodEndCount{ 0 };
+		int pos{0}, periodBeginCount{0}, periodEndCount{0};
 		double realTargetPee[ADJUST_PARAM::MAX_PERIOD_NUM][18];
 		double realTargetPbody[ADJUST_PARAM::MAX_PERIOD_NUM][6];
 
@@ -878,7 +925,7 @@ namespace Robots
 		case 'G':
 		case 'O':
 		default:
-			std::copy_n(*pAP->targetBodyPE, ADJUST_PARAM::MAX_PERIOD_NUM*6, *realTargetPbody);
+			std::copy_n(&pAP->targetBodyPE[0][0], ADJUST_PARAM::MAX_PERIOD_NUM*6, &realTargetPbody[0][0]);
 			break;
 		}
 
@@ -906,12 +953,26 @@ namespace Robots
 			for (int i = 0; i < 18; ++i)
 			{
 				pEE[i] = pAP->beginPee[i] * (cos(s) + 1) / 2 + realTargetPee[pos][i] * (1 - cos(s)) / 2;
-				
 			}
-			for (int i = 0; i < 6; ++i)
+			
+			/*以下用四元数进行插值*/
+			double pq_first[7], pq_second[7], pq[7];
+			s_pe2pq(pAP->beginBodyPE, pq_first);
+			s_pe2pq(realTargetPbody[pos], pq_second);
+
+			if (s_vn_dot_vn(4, &pq_first[3], &pq_second[3]) < 0)
 			{
-				pBody[i] = pAP->beginBodyPE[i] * (cos(s) + 1) / 2 + realTargetPbody[pos][i] * (1 - cos(s)) / 2;
+				for (int i = 3; i < 7; ++i)
+				{
+					pq_second[i] = -pq_second[i];
+				}
 			}
+
+			for (int i = 0; i < 7; ++i)
+			{
+				pq[i] = pq_first[i] * (cos(s) + 1) / 2 + pq_second[i] * (1 - cos(s)) / 2;
+			}
+			s_pq2pe(pq, pBody);
 		}
 		else
 		{
@@ -920,10 +981,28 @@ namespace Robots
 				pEE[i] = realTargetPee[pos-1][i] * (cos(s) + 1) / 2 + realTargetPee[pos][i] * (1 - cos(s)) / 2;
 				
 			}
-			for (int i = 0; i < 6; ++i)
+			/*for (int i = 0; i < 6; ++i)
 			{
 				pBody[i] = realTargetPbody[pos - 1][i] * (cos(s) + 1) / 2 + realTargetPbody[pos][i] * (1 - cos(s)) / 2;
+			}*/
+			/*以下用四元数进行插值*/
+			double pq_first[7], pq_second[7], pq[7];
+			s_pe2pq(realTargetPbody[pos - 1], pq_first);
+			s_pe2pq(realTargetPbody[pos], pq_second);
+
+			if (s_vn_dot_vn(4, &pq_first[3], &pq_second[3]) < 0)
+			{
+				for (int i = 3; i < 7; ++i)
+				{
+					pq_second[i] = -pq_second[i];
+				}
 			}
+
+			for (int i = 0; i < 7; ++i)
+			{
+				pq[i] = pq_first[i] * (cos(s) + 1) / 2 + pq_second[i] * (1 - cos(s)) / 2;
+			}
+			s_pq2pe(pq, pBody);
 		}
 
 		pRobot->SetPee(pEE, pBody);
@@ -938,36 +1017,109 @@ namespace Robots
 
 		return totalCount - pAP->count - 1;
 	}
-	
+	Aris::Core::MSG parseAdjust(const std::string &cmd, const std::map<std::string, std::string> &params)
+	{
+		double firstEE[18] =
+		{
+			-0.3,-0.75,-0.65,
+			-0.45,-0.75,0,
+			-0.3,-0.75,0.65,
+			0.3,-0.75,-0.65,
+			0.45,-0.75,0,
+			0.3,-0.75,0.65,
+		};
+
+		double beginEE[18]
+		{
+			-0.3,-0.85,-0.65,
+			-0.45,-0.85,0,
+			-0.3,-0.85,0.65,
+			0.3,-0.85,-0.65,
+			0.45,-0.85,0,
+			0.3,-0.85,0.65,
+		};
+
+		Robots::ADJUST_PARAM  param;
+
+		std::copy_n(firstEE, 18, param.targetPee[0]);
+		std::fill_n(param.targetBodyPE[0], 6, 0);
+		std::copy_n(beginEE, 18, param.targetPee[1]);
+		std::fill_n(param.targetBodyPE[1], 6, 0);
+
+		param.periodNum = 2;
+		param.periodCount[0] = 2000;
+		param.periodCount[1] = 2000;
+
+		std::strcpy(param.relativeCoordinate, "B");
+		std::strcpy(param.relativeBodyCoordinate, "B");
+
+		for (auto &i : params)
+		{
+			if (i.first == "all")
+			{
+
+			}
+			else if (i.first == "first")
+			{
+				param.legNum = 3;
+				param.motorNum = 9;
+
+				param.legID[0] = 0;
+				param.legID[1] = 2;
+				param.legID[2] = 4;
+
+				int motors[9] = { 0,1,2,6,7,8,12,13,14 };
+				std::copy_n(motors, 9, param.motorID);
+			}
+			else if (i.first == "second")
+			{
+				param.legNum = 3;
+				param.motorNum = 9;
+
+				param.legID[0] = 1;
+				param.legID[1] = 3;
+				param.legID[2] = 5;
+
+				int motors[9] = { 3,4,5,9,10,11,15,16,17 };
+				std::copy_n(motors, 9, param.motorID);
+			}
+		}
+
+		Aris::Core::MSG msg;
+
+		msg.CopyStruct(param);
+
+		return msg;
+	}
 	
 	
 	int move(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam)
 	{
-		const Robots::MOVE_PARAM *param = static_cast<const Robots::MOVE_PARAM *>(pParam);
+		//const Robots::MOVE_PARAM *param = static_cast<const Robots::MOVE_PARAM *>(pParam);
 
-		double beginPq[7], beginVq[7], endPq[7], endVq[7];
-		
-		/*计算末端位置和速度在初始位置下的相对值*/
-		double relativeBeginPm[16], relativeBeginPq[7]{0,0,0,0,0,0,1};
-		double relativeBeginVel[6], relativeBeginVq[6];
-		double relativeEndPm[16], relativeEndPq[7];
-		double relativeEndVel[6], relativeEndVq[6];
+		//double beginPq[7], beginVq[7], endPq[7], endVq[7];
+		//
+		///*计算末端位置和速度在初始位置下的相对值*/
+		//double relativeBeginPm[16], relativeBeginPq[7]{0,0,0,0,0,0,1};
+		//double relativeBeginVel[6], relativeBeginVq[6];
+		//double relativeEndPm[16], relativeEndPq[7];
+		//double relativeEndVel[6], relativeEndVq[6];
 
-		/*begin pm and pq*/
-		s_pq2pm(relativeBeginPq, relativeBeginPm);
+		///*begin pm and pq*/
+		//s_pq2pm(relativeBeginPq, relativeBeginPm);
 
-		/*begin vq*/
-		double pm1[16], pm2[16];
-		s_pe2pm(param->beginBodyPE, pm1);
-		s_inv_v2v(pm1, nullptr, param->beginBodyVel, relativeBeginVel);
-		s_v2vq(relativeBeginPm, relativeBeginVel, relativeBeginVq);
+		///*begin vq*/
+		//double pm1[16], pm2[16];
+		//s_pe2pm(param->beginBodyPE, pm1);
+		//s_inv_v2v(pm1, nullptr, param->beginBodyVel, relativeBeginVel);
+		//s_v2vq(relativeBeginPm, relativeBeginVel, relativeBeginVq);
 
-		/*end pq*/
-		s_pe2pm(param->targetBodyPE, pm2);
-		s_inv_pm_dot_pm(pm1, pm2, relativeEndPm);
+		///*end pq*/
+		//s_pe2pm(param->targetBodyPE, pm2);
+		//s_inv_pm_dot_pm(pm1, pm2, relativeEndPm);
 
-		/*end vq*/
-		s_inv_v2v(pm1, nullptr, param->beginBodyVel, relativeEndVel);
+		///*end vq*/
+		//s_inv_v2v(pm1, nullptr, param->beginBodyVel, relativeEndVel);
 		
 
 
@@ -982,7 +1134,7 @@ namespace Robots
 
 
 
-		param->beginBodyVel;
+		//param->beginBodyVel;
 
 
 

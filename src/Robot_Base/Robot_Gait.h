@@ -3,8 +3,10 @@
 
 #include <functional>
 #include <cstdint>
+#include <map>
 
 #include <Aris_ControlData.h>
+#include <Aris_Core.h>
 #include <Robot_Base.h>
 
 namespace Robots
@@ -44,6 +46,9 @@ namespace Robots
 	};
 	int walk(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam);
 	int walk2(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam);
+	Aris::Core::MSG parseWalk(const std::string &cmd, const std::map<std::string, std::string> &params);
+	
+
 
 	struct ADJUST_PARAM :public GAIT_PARAM_BASE
 	{
@@ -51,12 +56,13 @@ namespace Robots
 		
 		double targetPee[MAX_PERIOD_NUM][18];
 		double targetBodyPE[MAX_PERIOD_NUM][6];
-		std::int32_t periodCount[MAX_PERIOD_NUM];
-		std::int32_t periodNum;
+		std::int32_t periodCount[MAX_PERIOD_NUM]{1000};
+		std::int32_t periodNum{1};
 		char relativeCoordinate[8]{'G',0};
 		char relativeBodyCoordinate[8]{ 'G',0 };
 	};
 	int adjust(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam);
+	Aris::Core::MSG parseAdjust(const std::string &cmd, const std::map<std::string, std::string> &params);
 
 	struct MOVE_PARAM :public GAIT_PARAM_BASE
 	{

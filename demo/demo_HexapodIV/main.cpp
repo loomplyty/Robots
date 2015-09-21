@@ -58,7 +58,12 @@ int main()
 	double pEE_Mat[totalCount][18], pIn_Mat[totalCount][18], pBodyEp_Mat[totalCount][6];
 	
 	
+#ifdef PLATFORM_IS_WINDOWS
 	rbt.LoadXml("C:\\Robots\\resource\\HexapodIII\\HexapodIII.xml");
+#endif
+#ifdef PLATFORM_IS_LINUX
+	rbt.LoadXml("/usr/Robots/resource/HexapodIII/HexapodIII.xml");
+#endif
 
 	double beginPE[6]{ 0,0,-0.25,PI/2,0.3,-PI/2 };
 
@@ -166,8 +171,17 @@ int main()
 	dsp(pEE, 3, 1);
 
 
+	double pm1[16], pm2[16], pm3[16], pm_end[16];
 
+	double pe[6] = { 0.1,0.2,0.3,0,0,0 };
 
+	s_pe2pm(pe, pm1);
+	s_pe2pm(pe, pm2);
+	s_pe2pm(pe, pm3);
+
+	s_pm_dot_pm(pm1, pm2, pm3, pm_end);
+
+	dsp(pm_end,4,4);
 
 	cout << "finished" << endl;
 

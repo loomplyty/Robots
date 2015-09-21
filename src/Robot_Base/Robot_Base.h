@@ -18,44 +18,17 @@ namespace Robots
 	{
 	public:
 		/*!
-		* \brief Set the position of end-effector
-		* \param pEE position of end-effector, double array with 3 elements
-		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
-		*/
-		void SetPee(const double *pEE, const char *RelativeCoodinate = "G");
-		/*!
-		* \brief Set the velocity of end-effector, must be called after position is set
-		* \param vEE velocity of end-effector, double array with 3 elements
-		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
-		*/
-		void SetVee(const double *vEE, const char *RelativeCoodinate = "G");
-		/*!
-		* \brief Set the velocity of end-effector, must be called after velocity is set
-		* \param vEE acceleration of end-effector, double array with 3 elements
-		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
-		*/
-		void SetAee(const double *aEE, const char *RelativeCoodinate = "G");
-		/*!
-		* \brief Set the position of inputs
-		* \param pIn position of inputs, double array with 3 elements
-		*/
-		void SetPin(const double *pIn);
-		/*!
-		* \brief Set the velocity of inputs
-		* \param vIn velocity of inputs, double array with 3 elements
-		*/
-		void SetVin(const double *vIn);
-		/*!
-		* \brief Set the acceleration of inputs
-		* \param aIn acceleration of inputs, double array with 3 elements
-		*/
-		void SetAin(const double *aIn);
-		/*!
 		* \brief Get the position of end-effector
 		* \param pEE position of end-effector, double array with 3 elements
 		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
 		*/
 		void GetPee(double *pEE, const char *RelativeCoodinate = "G") const;
+		/*!
+		* \brief Set the position of end-effector
+		* \param pEE position of end-effector, double array with 3 elements
+		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
+		*/
+		void SetPee(const double *pEE, const char *RelativeCoodinate = "G");
 		/*!
 		* \brief Get the velocity of end-effector
 		* \param vEE velocity of end-effector, double array with 3 elements
@@ -63,33 +36,86 @@ namespace Robots
 		*/
 		void GetVee(double *vEE, const char *RelativeCoodinate = "G") const;
 		/*!
+		* \brief Set the velocity of end-effector, must be called after position is set
+		* \param vEE velocity of end-effector, double array with 3 elements
+		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
+		*/
+		void SetVee(const double *vEE, const char *RelativeCoodinate = "G");
+		/*!
 		* \brief Get the acceleration of end-effector
 		* \param pEE acceleration of end-effector, double array with 3 elements
 		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
 		*/
 		void GetAee(double *aEE, const char *RelativeCoodinate = "G") const;
 		/*!
+		* \brief Set the velocity of end-effector, must be called after velocity is set
+		* \param vEE acceleration of end-effector, double array with 3 elements
+		* \param RelativeCoodinate coordinate, which can be "O" or "G" both means origin ground, "M" or "B" mainbody, "L" leg
+		*/
+		void SetAee(const double *aEE, const char *RelativeCoodinate = "G");
+		/*!
+		* \brief Get the static end-effector force of inputs, which is equal to Jfd * Fin_sta
+		* \param fIn actuation force of inputs, double array with 3 elements
+		*/
+		void GetFeeSta(double *fEE_sta, const char *RelativeCoodinate = "G") const;
+		/*!
+		* \brief Set the static end-effector force of inputs, meanwhile the Fin_sta will be Jfi * Fee_sta
+		* \param aIn actuation force of inputs, double array with 3 elements
+		*/
+		void SetFeeSta(const double *fEE_sta, const char *RelativeCoodinate = "G");
+		/*!
 		* \brief Get the position of inputs
 		* \param pIn position of inputs, double array with 3 elements
 		*/
 		void GetPin(double *pIn) const;
+		/*!
+		* \brief Set the position of inputs
+		* \param pIn position of inputs, double array with 3 elements
+		*/
+		void SetPin(const double *pIn);
 		/*!
 		* \brief Get the velocity of inputs
 		* \param vIn velocity of inputs, double array with 3 elements
 		*/
 		void GetVin(double *vIn) const;
 		/*!
+		* \brief Set the velocity of inputs
+		* \param vIn velocity of inputs, double array with 3 elements
+		*/
+		void SetVin(const double *vIn);
+		/*!
 		* \brief Get the acceleration of inputs
 		* \param aIn acceleration of inputs, double array with 3 elements
 		*/
 		void GetAin(double *aIn) const;
-
-		void GetFceJacDir(double *jac, const char *RelativeCoodinate = "G") const;
-		void GetFceJacInv(double *jac, const char *RelativeCoodinate = "G") const;
-		void GetVelJacDir(double *jac, double *c = 0, const char *RelativeCoodinate = "G") const;
-		void GetVelJacInv(double *jac, double *c = 0, const char *RelativeCoodinate = "G") const;
-		void GetAccJacDir(double *jac, double *c = 0, const char *RelativeCoodinate = "G") const;
-		void GetAccJacInv(double *jac, double *c = 0, const char *RelativeCoodinate = "G") const;
+		/*!
+		* \brief Set the acceleration of inputs
+		* \param aIn acceleration of inputs, double array with 3 elements
+		*/
+		void SetAin(const double *aIn);
+		/*!
+		* \brief Get the static actuation force of inputs, which is equal to Jfi * Fee_sta
+		* \param fIn actuation force of inputs, double array with 3 elements
+		*/
+		void GetFinSta(double *fIn_sta) const;
+		/*!
+		* \brief Set the static actuation force of inputs, meanwhile the Fee_sta will be Jfd * Fin_sta
+		* \param aIn actuation force of inputs, double array with 3 elements
+		*/
+		void SetFinSta(const double *fIn_sta);
+		
+		void GetJfd(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetJfi(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetJvd(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetJvi(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetDifJfd(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetDifJfi(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetDifJvd(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetDifJvi(double *jac, const char *RelativeCoodinate = "G") const;
+		void GetCvd(double *c, const char *RelativeCoodinate = "G") const;
+		void GetCvi(double *c, const char *RelativeCoodinate = "G") const;
+		void GetCad(double *c, const char *RelativeCoodinate = "G") const;
+		void GetCai(double *c, const char *RelativeCoodinate = "G") const;
 
 		void TransformCoordinatePee(const double *bodyPe, const char *fromMak, const double *fromPee
 			, const char *toMak, double *toPee) const;
@@ -105,7 +131,7 @@ namespace Robots
 		virtual void calculate_from_aEE(){};
 		virtual void calculate_from_aIn(){};
 		virtual void calculate_jac(){};
-		virtual void calculate_jac_c(){};
+		virtual void calculate_diff_jac(){};
 
 	protected:		
 		ROBOT_BASE *pRobot;
@@ -145,6 +171,16 @@ namespace Robots
 		};
 		union
 		{
+			double fEE_sta[3];
+			struct
+			{
+				double fx_sta;
+				double fy_sta;
+				double fz_sta;
+			};
+		};
+		union
+		{
 			double pIn[3];
 			struct
 			{
@@ -173,12 +209,25 @@ namespace Robots
 				double al3;
 			};
 		};
+		union
+		{
+			double fIn_sta[3];
+			struct
+			{
+				double f1_sta;
+				double f2_sta;
+				double f3_sta;
+			};
+		};
 
 		double _c_acc_dir[3];
 		double _c_acc_inv[3];
 
-		double _jac_vel_dir[3][3];
-		double _jac_vel_inv[3][3];
+		double Jvd[3][3];
+		double Jvi[3][3];
+
+		double vJvd[3][3];
+		double vJvi[3][3];
 
 	private:
 		double _BasePrtPm[4][4];
@@ -213,18 +262,36 @@ namespace Robots
 		*/
 		void GetBodyAcc(double *bodyAcc) const;
 
-		void SetPee(const double *pEE = nullptr, const double *bodyPe = nullptr, const char *coodinate = "G", const char *eurType = "313");
-		void SetVee(const double *aEE = nullptr, const double *bodyPe = nullptr, const char *coodinate = "G");
-		void SetAee(const double *vEE = nullptr, const double *bodyPe = nullptr, const char *coodinate = "G");
-		void SetPin(const double *pIn = nullptr, const double *bodyPe = nullptr, const char *eurType = "313");
-		void SetVin(const double *vIn = nullptr, const double *bodyPe = nullptr);
-		void SetAin(const double *aIn = nullptr, const double *bodyPe = nullptr);
 		void GetPee(double *pEE, const char *RelativeCoodinate = "G") const;
+		void SetPee(const double *pEE = nullptr, const double *bodyPe = nullptr, const char *coodinate = "G", const char *eurType = "313");
 		void GetVee(double *aEE, const char *RelativeCoodinate = "G") const;
+		void SetVee(const double *vEE = nullptr, const double *bodyVel = nullptr, const char *coodinate = "G");
 		void GetAee(double *vEE, const char *RelativeCoodinate = "G") const;
+		void SetAee(const double *aEE = nullptr, const double *bodyAcc = nullptr, const char *coodinate = "G");
+		void GetFeeSta(double *fee_sta, const char *RelativeCoodinate = "G") const;
+		void SetFeeSta(const double *fee_sta, const char *RelativeCoodinate = "G");
+		
 		void GetPin(double *pIn) const;
+		void SetPin(const double *pIn = nullptr, const double *bodyPe = nullptr, const char *eurType = "313");
 		void GetVin(double *vIn) const;
+		void SetVin(const double *vIn = nullptr, const double *bodyPe = nullptr);
 		void GetAin(double *aIn) const;
+		void SetAin(const double *aIn = nullptr, const double *bodyPe = nullptr);
+		void GetFinSta(double *fIn_sta) const;
+		void SetFinSta(const double *fIn_sta);
+
+		/*!
+		* \brief 根据雅可比矩阵和初值迭代求解，主要用来在已知足端位置和输入位置时，机器人身体的位置。
+		* 对于固定于地面的腿，对其SetPee，然后迭代求解身体位姿，之后对不在地面上的腿SetPin
+		*/
+		void SetPinFixFeet(const double *pIn, const char *fixFeet, const char *activeMotor, const double *initBodyPE);
+		void SetVinFixFeet(const double *vIn, const char *fixFeet, const char *activeMotor);
+		void SetAinFixFeet(const double *aIn, const char *fixFeet, const char *activeMotor);
+
+		void GetJfd(double *jac_out, const char *activeMotion = "111111111111111111") const;
+		void GetJvi(double *jac_out, const char *activeMotion = "111111111111111111") const;
+		void GetDifJfd(double *jac_out, const char *activeMotion = "111111111111111111") const;
+		void GetDifJvi(double *jac_out, const char *activeMotion = "111111111111111111") const;
 
 		void TransformCoordinatePee(const double *bodyPe, const char *fromMak, const double *fromPee
 			, const char *toMak, double *toPee) const;
@@ -240,8 +307,10 @@ namespace Robots
 
 	private:
 		double _BodyPm[4][4], _BodyVel[6], _BodyAcc[6];
-
-		std::vector<GAIT_FUNC> gaitList;
+		double Jvi[18][6];
+		double vJvi[18][6];
+		void calculate_jac();
+		void calculate_jac_c();
 
 		friend class LEG_BASE;
 	};

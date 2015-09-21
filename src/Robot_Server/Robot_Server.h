@@ -49,6 +49,10 @@ namespace Robots
 			{
 				pRobot = std::unique_ptr<Robots::ROBOT_BASE>{ new T };
 			}
+			else
+			{
+				throw std::logic_error("already has a robot instance");
+			}
 		};
 		void LoadXml(const char *fileName);
 		void AddGait(std::string cmdName, GAIT_FUNC gaitFunc, PARSE_FUNC parseFunc);
@@ -62,7 +66,7 @@ namespace Robots
 
 		void DecodeMsg(const Aris::Core::MSG &msg, std::string &cmd, std::map<std::string, std::string> &params);
 		void GenerateCmdMsg(const std::string &cmd, const std::map<std::string, std::string> &params, Aris::Core::MSG &msg);
-		void ExecuteMsg(const Aris::Core::MSG &m);
+		void ExecuteMsg(const Aris::Core::MSG &m, Aris::Core::MSG &retError);
 		
 		void inline p2a(const int *phy, int *abs, int num = 18)
 		{
@@ -103,6 +107,8 @@ namespace Robots
 
 		double homeEE[18], homeIn[18];
 		int homeCount[18];
+		int homeCur{ 0 };
+		double meter2count{ 0 };
 
 		int mapPhy2Abs[18];
 		int mapAbs2Phy[18];

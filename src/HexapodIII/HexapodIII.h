@@ -35,17 +35,17 @@ namespace Robots
 		{
 			struct
 			{
-				Aris::DynKer::JOINT *pU1;/*!< \brief 指向关节U1的指针 */
-				Aris::DynKer::JOINT *pU2;/*!< \brief 指向关节U2的指针 */
-				Aris::DynKer::JOINT *pU3;/*!< \brief 指向关节U3的指针 */
-				Aris::DynKer::JOINT *pP1;/*!< \brief 指向关节P1的指针 */
-				Aris::DynKer::JOINT *pP2;/*!< \brief 指向关节P2的指针 */
-				Aris::DynKer::JOINT *pP3;/*!< \brief 指向关节P3的指针 */
-				Aris::DynKer::JOINT *pS2;/*!< \brief 指向关节S2的指针 */
-				Aris::DynKer::JOINT *pS3;/*!< \brief 指向关节S3的指针 */
-				Aris::DynKer::JOINT *pSf;/*!< \brief 指向关节Sf的指针 */
+				Aris::DynKer::JOINT_BASE *pU1;/*!< \brief 指向关节U1的指针 */
+				Aris::DynKer::JOINT_BASE *pU2;/*!< \brief 指向关节U2的指针 */
+				Aris::DynKer::JOINT_BASE *pU3;/*!< \brief 指向关节U3的指针 */
+				Aris::DynKer::JOINT_BASE *pP1;/*!< \brief 指向关节P1的指针 */
+				Aris::DynKer::JOINT_BASE *pP2;/*!< \brief 指向关节P2的指针 */
+				Aris::DynKer::JOINT_BASE *pP3;/*!< \brief 指向关节P3的指针 */
+				Aris::DynKer::JOINT_BASE *pS2;/*!< \brief 指向关节S2的指针 */
+				Aris::DynKer::JOINT_BASE *pS3;/*!< \brief 指向关节S3的指针 */
+				Aris::DynKer::JOINT_BASE *pSf;/*!< \brief 指向关节Sf的指针 */
 			};
-			Aris::DynKer::JOINT *pJnts[9];
+			Aris::DynKer::JOINT_BASE *pJnts[9];
 		};
 		union
 		{
@@ -77,14 +77,28 @@ namespace Robots
 		{
 			struct
 			{
-				Aris::DynKer::MOTION *pM1;/*!< \brief 指向驱动M1的指针 */
-				Aris::DynKer::MOTION *pM2;/*!< \brief 指向驱动M2的指针 */
-				Aris::DynKer::MOTION *pM3;/*!< \brief 指向驱动M3的指针 */
+				Aris::DynKer::MOTION_BASE *pM1;/*!< \brief 指向驱动M1的指针 */
+				Aris::DynKer::MOTION_BASE *pM2;/*!< \brief 指向驱动M2的指针 */
+				Aris::DynKer::MOTION_BASE *pM3;/*!< \brief 指向驱动M3的指针 */
 			};
 
-			Aris::DynKer::MOTION *pMots[3];
+			Aris::DynKer::MOTION_BASE *pMots[3];
+		};
+		union
+		{
+			struct
+			{
+				Aris::DynKer::SINGLE_COMPONENT_FORCE *pF1;/*!< \brief 指向驱动M1的指针 */
+				Aris::DynKer::SINGLE_COMPONENT_FORCE *pF2;/*!< \brief 指向驱动M2的指针 */
+				Aris::DynKer::SINGLE_COMPONENT_FORCE *pF3;/*!< \brief 指向驱动M3的指针 */
+			};
+
+			Aris::DynKer::SINGLE_COMPONENT_FORCE *pFces[3];
 		};
 		
+	public:
+		void GetdJacOverPee(double *dJi_x, double *dJi_y, double *dJi_z, const char *relativeCoordinate="G")const;
+
 	private:
 		LEG_III(const char *Name, ROBOT_III* pRobot);
 		virtual ~LEG_III() = default;
@@ -92,7 +106,8 @@ namespace Robots
 		void FastDyn();
 		
 		void GetFin(double *fIn) const;
-		void SetFin(const double *fIn);
+		void GetFinDyn(double *fIn) const;
+		void GetFinFrc(double *fIn) const;
 
 		virtual void calculate_from_pEE();
 		virtual void calculate_from_pIn();
@@ -102,7 +117,7 @@ namespace Robots
 		virtual void calculate_from_aIn();
 
 		virtual void calculate_jac();
-		virtual void calculate_jac_c();
+		virtual void calculate_diff_jac();
 
 		void _CalCdByPos();
 		void _CalCdByPlen();
@@ -120,6 +135,27 @@ namespace Robots
 		void _CalAvarByAcd();
 		void _CalApartByAvar();
 
+	private:
+		union
+		{
+			double fIn_dyn[3];
+			struct
+			{
+				double f1_dyn;
+				double f2_dyn;
+				double f3_dyn;
+			};
+		};
+		union
+		{
+			double fIn_frc[3];
+			struct
+			{
+				double f1_frc;
+				double f2_frc;
+				double f3_frc;
+			};
+		};
 
 	private:
 		ROBOT_III *pRobot;
@@ -146,16 +182,9 @@ namespace Robots
 		double k21, k22, k23, k31, k32, k33;
 		double vk21, vk22, vk23, vk31, vk32, vk33;
 		double J1[3][3], J2[3][3], vJ1[3][3], vJ2[3][3];
+		double inv_J1[3][3], inv_J2[3][3];
 
 		double _C[36][36];
-		double _I[36][36];
-		double _f[36];
-		double _v[36];
-		double _a_c[36];
-
-		double _a[36];
-		double _epsilon[36];
-
 		double _c_M[36][4];
 
 		friend class ROBOT_III;
@@ -163,20 +192,35 @@ namespace Robots
 	class ROBOT_III :public Aris::DynKer::MODEL, public Robots::ROBOT_BASE
 	{
 	public:
+		struct STATE
+		{
+			double pEE[18], vEE[18], aEE[18], fIn[18];
+			double bodyPE[6], bodyVel[6], bodyAcc[6];
+			bool isMotorActive[18];
+			bool isSfActive[6];
+		};
+
 		ROBOT_III();
 		~ROBOT_III() = default;
-
-		void GetFin(double *fIn) const;
-		void SetFin(const double *fIn);
-
-		void SetFixedFeet(const char *fixedLeg = 0, const char *ActiveMotion = 0);
-		void FastDyn();
 		virtual void LoadXml(const char *filename);
 
-		void SimulateInverse(GAIT_FUNC fun, GAIT_PARAM_BASE *param);
-		void SimulateForward(GAIT_FUNC fun, GAIT_PARAM_BASE *param, Aris::DynKer::SIMULATE_SCRIPT *script = nullptr);
-		void SimulateForwardByAdams(const char *adamsFile, GAIT_FUNC fun, GAIT_PARAM_BASE *param, Aris::DynKer::SIMULATE_SCRIPT *script = nullptr);
 
+		void GetFin(double *fIn) const;
+		void GetFinDyn(double *fIn) const;
+		void GetFinFrc(double *fIn) const;
+
+		void GetState(ROBOT_III::STATE &state) const;
+		void SetState(const ROBOT_III::STATE &state);
+
+		void SetFixFeet(const char* fixFeet);
+		const char* GetFixFeet() const;
+		void SetActiveMotion(const char* activeMotion);
+		const char* GetActiveMotion() const;
+		void FastDyn();
+		
+		void SimByAdamsResultAt(int momentTime);
+		void SimByAdams(const char *adamsFile, const GAIT_FUNC &fun, GAIT_PARAM_BASE *param, const Aris::DynKer::SIMULATE_SCRIPT *script = nullptr);
+		void SimByAdams(const char *adamsFile, const GAIT_FUNC &fun, GAIT_PARAM_BASE *param, int dt);
 	public:
 		union
 		{
@@ -194,6 +238,9 @@ namespace Robots
 
 		Aris::DynKer::PART* pBody;
 		Aris::DynKer::MARKER* pBodyCenter;
+
+	public:
+		
 
 	private:
 		LEG_III LF_Leg{ "LF", this };
@@ -213,12 +260,49 @@ namespace Robots
 		script->ScriptDeactivate(time, pRobot->pRM->pSf);
 		script->ScriptActivate(time, pRobot->pRR->pSf);
 
-		script->ScriptSwitchMode(time, pRobot->pLF->pM1, Aris::DynKer::MOTION::POS_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pLM->pM1, Aris::DynKer::MOTION::FCE_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pLR->pM1, Aris::DynKer::MOTION::POS_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pRF->pM1, Aris::DynKer::MOTION::FCE_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pRM->pM1, Aris::DynKer::MOTION::POS_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pRR->pM1, Aris::DynKer::MOTION::FCE_CONTROL);
+		script->ScriptActivate(time, pRobot->pLF->pM1);
+		script->ScriptActivate(time, pRobot->pLF->pM2);
+		script->ScriptActivate(time, pRobot->pLF->pM3);
+		script->ScriptDeactivate(time, pRobot->pLF->pF1);
+		script->ScriptDeactivate(time, pRobot->pLF->pF2);
+		script->ScriptDeactivate(time, pRobot->pLF->pF3);
+
+		script->ScriptActivate(time, pRobot->pLR->pM1);
+		script->ScriptActivate(time, pRobot->pLR->pM2);
+		script->ScriptActivate(time, pRobot->pLR->pM3);
+		script->ScriptDeactivate(time, pRobot->pLR->pF1);
+		script->ScriptDeactivate(time, pRobot->pLR->pF2);
+		script->ScriptDeactivate(time, pRobot->pLR->pF3);
+
+		script->ScriptActivate(time, pRobot->pRM->pM1);
+		script->ScriptActivate(time, pRobot->pRM->pM2);
+		script->ScriptActivate(time, pRobot->pRM->pM3);
+		script->ScriptDeactivate(time, pRobot->pRM->pF1);
+		script->ScriptDeactivate(time, pRobot->pRM->pF2);
+		script->ScriptDeactivate(time, pRobot->pRM->pF3);
+
+		script->ScriptDeactivate(time, pRobot->pLM->pM1);
+		script->ScriptActivate(time, pRobot->pLM->pM2);
+		script->ScriptActivate(time, pRobot->pLM->pM3);
+		script->ScriptActivate(time, pRobot->pLM->pF1);
+		script->ScriptDeactivate(time, pRobot->pLM->pF2);
+		script->ScriptDeactivate(time, pRobot->pLM->pF3);
+
+		script->ScriptDeactivate(time, pRobot->pRF->pM1);
+		script->ScriptActivate(time, pRobot->pRF->pM2);
+		script->ScriptActivate(time, pRobot->pRF->pM3);
+		script->ScriptActivate(time, pRobot->pRF->pF1);
+		script->ScriptDeactivate(time, pRobot->pRF->pF2);
+		script->ScriptDeactivate(time, pRobot->pRF->pF3);
+
+		script->ScriptDeactivate(time, pRobot->pRR->pM1);
+		script->ScriptActivate(time, pRobot->pRR->pM2);
+		script->ScriptActivate(time, pRobot->pRR->pM3);
+		script->ScriptActivate(time, pRobot->pRR->pF1);
+		script->ScriptDeactivate(time, pRobot->pRR->pF2);
+		script->ScriptDeactivate(time, pRobot->pRR->pF3);
+
+		
 	}
 	inline void Activate135(int time, ROBOT_III *pRobot, Aris::DynKer::SIMULATE_SCRIPT *script)
 	{
@@ -229,79 +313,147 @@ namespace Robots
 		script->ScriptActivate(time, pRobot->pRM->pSf);
 		script->ScriptDeactivate(time, pRobot->pRR->pSf);
 
-		script->ScriptSwitchMode(time, pRobot->pLF->pM1, Aris::DynKer::MOTION::FCE_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pLM->pM1, Aris::DynKer::MOTION::POS_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pLR->pM1, Aris::DynKer::MOTION::FCE_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pRF->pM1, Aris::DynKer::MOTION::POS_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pRM->pM1, Aris::DynKer::MOTION::FCE_CONTROL);
-		script->ScriptSwitchMode(time, pRobot->pRR->pM1, Aris::DynKer::MOTION::POS_CONTROL);
+		script->ScriptDeactivate(time, pRobot->pLF->pM1);
+		script->ScriptActivate(time, pRobot->pLF->pM2);
+		script->ScriptActivate(time, pRobot->pLF->pM3);
+		script->ScriptActivate(time, pRobot->pLF->pF1);
+		script->ScriptDeactivate(time, pRobot->pLF->pF2);
+		script->ScriptDeactivate(time, pRobot->pLF->pF3);
 
+		script->ScriptDeactivate(time, pRobot->pLR->pM1);
+		script->ScriptActivate(time, pRobot->pLR->pM2);
+		script->ScriptActivate(time, pRobot->pLR->pM3);
+		script->ScriptActivate(time, pRobot->pLR->pF1);
+		script->ScriptDeactivate(time, pRobot->pLR->pF2);
+		script->ScriptDeactivate(time, pRobot->pLR->pF3);
+
+		script->ScriptDeactivate(time, pRobot->pRM->pM1);
+		script->ScriptActivate(time, pRobot->pRM->pM2);
+		script->ScriptActivate(time, pRobot->pRM->pM3);
+		script->ScriptActivate(time, pRobot->pRM->pF1);
+		script->ScriptDeactivate(time, pRobot->pRM->pF2);
+		script->ScriptDeactivate(time, pRobot->pRM->pF3);
+
+		script->ScriptActivate(time, pRobot->pLM->pM1);
+		script->ScriptActivate(time, pRobot->pLM->pM2);
+		script->ScriptActivate(time, pRobot->pLM->pM3);
+		script->ScriptDeactivate(time, pRobot->pLM->pF1);
+		script->ScriptDeactivate(time, pRobot->pLM->pF2);
+		script->ScriptDeactivate(time, pRobot->pLM->pF3);
+
+		script->ScriptActivate(time, pRobot->pRF->pM1);
+		script->ScriptActivate(time, pRobot->pRF->pM2);
+		script->ScriptActivate(time, pRobot->pRF->pM3);
+		script->ScriptDeactivate(time, pRobot->pRF->pF1);
+		script->ScriptDeactivate(time, pRobot->pRF->pF2);
+		script->ScriptDeactivate(time, pRobot->pRF->pF3);
+
+		script->ScriptActivate(time, pRobot->pRR->pM1);
+		script->ScriptActivate(time, pRobot->pRR->pM2);
+		script->ScriptActivate(time, pRobot->pRR->pM3);
+		script->ScriptDeactivate(time, pRobot->pRR->pF1);
+		script->ScriptDeactivate(time, pRobot->pRR->pF2);
+		script->ScriptDeactivate(time, pRobot->pRR->pF3);
 	}
 	inline void Activate024(ROBOT_III *pRobot)
 	{
 		pRobot->pLF->pSf->Deactivate();
-		pRobot->pLM->pSf->Activate();
+		pRobot->pLF->pM1->Activate();
+		pRobot->pLF->pM2->Activate();
+		pRobot->pLF->pM3->Activate();
+		pRobot->pLF->pF1->Deactivate();
+		pRobot->pLF->pF2->Deactivate();
+		pRobot->pLF->pF3->Deactivate();
+
 		pRobot->pLR->pSf->Deactivate();
-		pRobot->pRF->pSf->Activate();
+		pRobot->pLR->pM1->Activate();
+		pRobot->pLR->pM2->Activate();
+		pRobot->pLR->pM3->Activate();
+		pRobot->pLR->pF1->Deactivate();
+		pRobot->pLR->pF2->Deactivate();
+		pRobot->pLR->pF3->Deactivate();
+
 		pRobot->pRM->pSf->Deactivate();
+		pRobot->pRM->pM1->Activate();
+		pRobot->pRM->pM2->Activate();
+		pRobot->pRM->pM3->Activate();
+		pRobot->pRM->pF1->Deactivate();
+		pRobot->pRM->pF2->Deactivate();
+		pRobot->pRM->pF3->Deactivate();
+
+		pRobot->pLM->pSf->Activate();
+		pRobot->pLM->pM1->Deactivate();
+		pRobot->pLM->pM2->Activate();
+		pRobot->pLM->pM3->Activate();
+		pRobot->pLM->pF1->Activate();
+		pRobot->pLM->pF2->Deactivate();
+		pRobot->pLM->pF3->Deactivate();
+
+		pRobot->pRF->pSf->Activate();
+		pRobot->pRF->pM1->Deactivate();
+		pRobot->pRF->pM2->Activate();
+		pRobot->pRF->pM3->Activate();
+		pRobot->pRF->pF1->Activate();
+		pRobot->pRF->pF2->Deactivate();
+		pRobot->pRF->pF3->Deactivate();
+
 		pRobot->pRR->pSf->Activate();
-
-		pRobot->pLF->pM1->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLF->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLF->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pLM->pM1->SetMode(Aris::DynKer::MOTION::FCE_CONTROL);
-		pRobot->pLM->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLM->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pLR->pM1->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLR->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLR->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pRF->pM1->SetMode(Aris::DynKer::MOTION::FCE_CONTROL);
-		pRobot->pRF->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRF->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pRM->pM1->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRM->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRM->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pRR->pM1->SetMode(Aris::DynKer::MOTION::FCE_CONTROL);
-		pRobot->pRR->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRR->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
+		pRobot->pRR->pM1->Deactivate();
+		pRobot->pRR->pM2->Activate();
+		pRobot->pRR->pM3->Activate();
+		pRobot->pRR->pF1->Activate();
+		pRobot->pRR->pF2->Deactivate();
+		pRobot->pRR->pF3->Deactivate();
 	}
 	inline void Activate135(ROBOT_III *pRobot)
 	{
 		pRobot->pLF->pSf->Activate();
-		pRobot->pLM->pSf->Deactivate();
+		pRobot->pLF->pM1->Deactivate();
+		pRobot->pLF->pM2->Activate();
+		pRobot->pLF->pM3->Activate();
+		pRobot->pLF->pF1->Activate();
+		pRobot->pLF->pF2->Deactivate();
+		pRobot->pLF->pF3->Deactivate();
+
 		pRobot->pLR->pSf->Activate();
-		pRobot->pRF->pSf->Deactivate();
+		pRobot->pLR->pM1->Deactivate();
+		pRobot->pLR->pM2->Activate();
+		pRobot->pLR->pM3->Activate();
+		pRobot->pLR->pF1->Activate();
+		pRobot->pLR->pF2->Deactivate();
+		pRobot->pLR->pF3->Deactivate();
+
 		pRobot->pRM->pSf->Activate();
+		pRobot->pRM->pM1->Deactivate();
+		pRobot->pRM->pM2->Activate();
+		pRobot->pRM->pM3->Activate();
+		pRobot->pRM->pF1->Activate();
+		pRobot->pRM->pF2->Deactivate();
+		pRobot->pRM->pF3->Deactivate();
+
+		pRobot->pLM->pSf->Deactivate();
+		pRobot->pLM->pM1->Activate();
+		pRobot->pLM->pM2->Activate();
+		pRobot->pLM->pM3->Activate();
+		pRobot->pLM->pF1->Deactivate();
+		pRobot->pLM->pF2->Deactivate();
+		pRobot->pLM->pF3->Deactivate();
+
+		pRobot->pRF->pSf->Deactivate();
+		pRobot->pRF->pM1->Activate();
+		pRobot->pRF->pM2->Activate();
+		pRobot->pRF->pM3->Activate();
+		pRobot->pRF->pF1->Deactivate();
+		pRobot->pRF->pF2->Deactivate();
+		pRobot->pRF->pF3->Deactivate();
+
 		pRobot->pRR->pSf->Deactivate();
-
-		pRobot->pLF->pM1->SetMode(Aris::DynKer::MOTION::FCE_CONTROL);
-		pRobot->pLF->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLF->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pLM->pM1->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLM->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLM->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pLR->pM1->SetMode(Aris::DynKer::MOTION::FCE_CONTROL);
-		pRobot->pLR->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pLR->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pRF->pM1->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRF->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRF->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pRM->pM1->SetMode(Aris::DynKer::MOTION::FCE_CONTROL);
-		pRobot->pRM->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRM->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-
-		pRobot->pRR->pM1->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRR->pM2->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
-		pRobot->pRR->pM3->SetMode(Aris::DynKer::MOTION::POS_CONTROL);
+		pRobot->pRR->pM1->Activate();
+		pRobot->pRR->pM2->Activate();
+		pRobot->pRR->pM3->Activate();
+		pRobot->pRR->pF1->Deactivate();
+		pRobot->pRR->pF2->Deactivate();
+		pRobot->pRR->pF3->Deactivate();
 	}
 
 }
