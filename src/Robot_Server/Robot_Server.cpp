@@ -18,7 +18,7 @@ using namespace std;
 
 namespace Robots
 {
-	const double meter2count = 1 / 0.01*3.5 * 65536;
+    //const double meter2count = 1 / 0.01*3.5 * 65536;
 
 	void ROBOT_SERVER::LoadXml(const char *fileName)
 	{
@@ -150,6 +150,22 @@ namespace Robots
 
 		}
 	};
+
+
+/*	void ROBOT_SERVER::AddOnlineGait(std::string cmdName, GAIT_ONLINE_FUNC gaitFunc, PARSE_FUNC parseFunc)
+	{
+	 	if (mapName2ID.find(cmdName) == mapName2ID.end())
+		{
+			allOnlineGaits.push_back(gaitFunc);
+			allOnlineParsers.push_back(parseFunc);
+
+			mapName2ID.insert(std::make_pair(cmdName, allGaits.size() - 1));
+
+			std::cout << cmdName << ":" << mapName2ID.at(cmdName) << std::endl;
+
+		}
+	};
+*/
 	void ROBOT_SERVER::Start()
 	{
 #ifdef PLATFORM_IS_LINUX
@@ -157,7 +173,7 @@ namespace Robots
 
 		initParam.motorNum = 18;
 		initParam.homeMode = -1;
-		initParam.homeTorqueLimit = 950;
+        initParam.homeTorqueLimit = 0;
 		initParam.homeHighSpeed = 280000;
 		initParam.homeLowSpeed = 160000;
 		initParam.homeOffsets = homeCount;
@@ -258,6 +274,8 @@ namespace Robots
 
 			params.insert(std::make_pair(cmdd, param));
 		}
+
+
 	}
 	void ROBOT_SERVER::GenerateCmdMsg(const std::string &cmd, const std::map<std::string, std::string> &params, Aris::Core::MSG &msg)
 	{
@@ -403,6 +421,7 @@ namespace Robots
 			msg = this->allParsers.at(cmdPair->second).operator()(cmd, params);
 			reinterpret_cast<GAIT_PARAM_BASE *>(msg.GetDataAddress())->cmdType=RUN_GAIT;
 			reinterpret_cast<GAIT_PARAM_BASE *>(msg.GetDataAddress())->cmdID=cmdPair->second;
+
 		}
 		else
 		{
@@ -416,7 +435,7 @@ namespace Robots
 		DecodeMsg(msg, cmd, params);
 
 		Aris::Core::MSG cmdMsg;
-		GenerateCmdMsg(cmd, params, cmdMsg);
+        GenerateCmdMsg(cmd, params, cmdMsg);
 
 		cmdMsg.SetMsgID(0);
 
@@ -450,7 +469,7 @@ namespace Robots
 
 				if (param->count % 1000 == 0)
 				{
-					rt_printf("motor %d not homed, physical id is:\n", id[i]);
+                    rt_printf("motor %d not homed, physical id is:\n", id[i]);
 					rt_printf("motor %d not homed, absolute id is:\n", param->motorID[i]);
 				}
 			}
@@ -558,15 +577,18 @@ namespace Robots
 	}
 	int ROBOT_SERVER::runGait(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data)
 	{
+
 		int ret = 0;
 		double pIn[18], pEE_B[18];
 
 		pRobot->TransformCoordinatePee(pParam->beginBodyPE,"G",pParam->beginPee,"B",pEE_B);
 
-		ret = this->allGaits.at(pParam->cmdID).operator()(pRobot,pParam);
+		ret = this->allGaits.at(pParam->cmdID).operator()(pRobot,pParam); //pRobot legs and body altered
 
-		pRobot->GetPin(pIn);
+        pRobot->GetPin(pIn);
 
+/********************position mode *************/
+        //position mode,writing down positions to machinedata
 
 		int id[18];
 		a2p(pParam->motorID, id, pParam->motorNum);
@@ -588,13 +610,36 @@ namespace Robots
 				pRobot->pLegs[i]->SetPee(pEE_B+i*3,"B");
 			}
 		}
+        //force verification
+        Robots::ROBOT_III* robotIII=dynamic_cast<Robots::ROBOT_III*>(pRobot);
+
+        //need set already pos and vel in rungait functions, so that here we can use fastdyn
+        robotIII->FastDyn();
+        robotIII->SetFixedFeet("000000");
+        //robotIII.setactivemotion("01010100")//18
+    //    Robots::ROBOT_III::FastDyn();
+
+
+      /*  static double fIN[18]{0},model_fIN[18]{0};
+        for(int i=0;i<18;i++)
+        {
+            fIN[i]=pParam->pActuationData->feedbackData[i].Torque*Robots::current2torque;
+            pRobot
+            model_fIN[]
+
+
+        }*/
+
+/*************************torque mode***********************/
+
+
 
 		return ret;
 	}
 
 	int ROBOT_SERVER::execute_cmd(int count, char *cmd, Aris::RT_CONTROL::CMachineData &data)
 	{
-		static double pBody[6]{ 0 }, vBody[6]{ 0 }, pEE[18]{ 0 }, vEE[18]{ 0 };
+        static double pBody[6]{ 0 }, vBody[6]{ 0 }, pEE[18]{ 0 }, vEE[18]{ 0 };
 
 		int ret;
 
@@ -606,6 +651,7 @@ namespace Robots
 		memcpy(pParam->beginVee, vEE, sizeof(vEE));
 		memcpy(pParam->beginBodyPE, pBody, sizeof(pBody));
 		memcpy(pParam->beginBodyVel, pBody, sizeof(vBody));
+
 
 		switch (pParam->cmdType)
 		{
@@ -622,7 +668,7 @@ namespace Robots
 			ret = resetOrigin(pRobot.get(), pParam, data);
 			break;
 		case RUN_GAIT:
-			ret = runGait(pRobot.get(), pParam, data);
+            ret = runGait(pRobot.get(), pParam, data);
 			break;
 		default:
 			rt_printf("unknown cmd type\n");
@@ -635,7 +681,7 @@ namespace Robots
 			pRobot->GetBodyPe(pBody);
 			pRobot->GetPee(pEE);
 			pRobot->GetBodyVel(vBody);
-			pRobot->GetVee(vEE);
+            pRobot->GetVee(vEE);
 
 
 			rt_printf("%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n"
@@ -645,12 +691,12 @@ namespace Robots
 				, pBody[0], pBody[1], pBody[2], pBody[3], pBody[4], pBody[5]);
 		}
 
-
 		return ret;
 	}
 
 	int ROBOT_SERVER::tg(Aris::RT_CONTROL::CMachineData &data, Aris::Core::RT_MSG &recvMsg, Aris::Core::RT_MSG &sendMsg)
 	{
+        // in tg recvMsg.GetMsgID()=0 if it is a validate message;and,
 		static double pBodyPE[6]{ 0 }, pEE[18]{ 0 };
 
 		static const int cmdSize = 8192;
@@ -668,11 +714,15 @@ namespace Robots
 		stateData = data;
 		cmdData = data;
 
+
+
 		switch (recvMsg.GetMsgID())
 		{
 		case 0:
 			recvMsg.Paste(cmdQueue[(currentCmd + cmdNum) % 10]);
 			++cmdNum;
+            rt_printf("recvMsg datalength %d\n",recvMsg.GetLength());
+
 			break;
 		default:
 			break;
@@ -681,7 +731,7 @@ namespace Robots
 
 		if (cmdNum>0)
 		{
-			if (Robots::ROBOT_SERVER::GetInstance()->execute_cmd(count, cmdQueue[currentCmd], cmdData) == 0)
+			if (Robots::ROBOT_SERVER::GetInstance()->execute_cmd(count, cmdQueue[currentCmd], cmdData) == 0)///cmdData should be data
 			{
 				count = 0;
 				currentCmd = (currentCmd + 1) % 10;
@@ -726,7 +776,7 @@ namespace Robots
 							double pBody[6];
 							pR->GetPee(pEE);
 							pR->GetBodyPe(pBody);
-							rt_printf("%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n"
+                        /*	rt_printf("%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n"
 											, pEE[0], pEE[1], pEE[2], pEE[3], pEE[4], pEE[5], pEE[6], pEE[7], pEE[8]
 											, pEE[9], pEE[10], pEE[11], pEE[12], pEE[13], pEE[14], pEE[15], pEE[16], pEE[17]);
 										rt_printf("%f %f %f %f %f %f\n"
@@ -737,6 +787,7 @@ namespace Robots
 							{
 								rt_printf("%d %d\n",lastCmdData.commandData[i].Position,cmdData.commandData[i].Position);
 							}
+                            */
 							firstError=false;
 						}
 

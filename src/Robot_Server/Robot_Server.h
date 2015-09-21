@@ -17,7 +17,11 @@
 namespace Robots
 {
 	typedef std::function<Aris::Core::MSG(const std::string &cmd, const std::map<std::string, std::string> &params)> PARSE_FUNC;
-	
+	typedef std::function<int(ROBOT_BASE *, const GAIT_PARAM_BASE *,Aris::RT_CONTROL::CMachineData &)> GAIT_ONLINE_FUNC;
+    const double meter2count = 1 / 0.01*3.5 * 65536;
+    const double current2torque=100;
+
+
 	enum ROBOT_CMD_ID
 	{
 		ENABLE,
@@ -48,6 +52,8 @@ namespace Robots
 		};
 		void LoadXml(const char *fileName);
 		void AddGait(std::string cmdName, GAIT_FUNC gaitFunc, PARSE_FUNC parseFunc);
+		void AddOnlineGait(std::string cmdName, GAIT_ONLINE_FUNC gaitFunc, PARSE_FUNC parseFunc);
+
 		void Start();
 
 	private:
@@ -79,13 +85,18 @@ namespace Robots
 		int resetOrigin(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *param, Aris::RT_CONTROL::CMachineData &data);
 		int runGait(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data);
 
+
 		int execute_cmd(int count, char *cmd, Aris::RT_CONTROL::CMachineData &data);
 		static int tg(Aris::RT_CONTROL::CMachineData &data, Aris::Core::RT_MSG &recvMsg, Aris::Core::RT_MSG &sendMsg);
+
 	private:
-		std::unique_ptr<Robots::ROBOT_BASE> pRobot;
+        std::unique_ptr<Robots::ROBOT_BASE> pRobot;
 		std::map<std::string, int> mapName2ID;
 		std::vector<GAIT_FUNC> allGaits;
+		std::vector<GAIT_ONLINE_FUNC> allOnlineGaits;
+
 		std::vector<PARSE_FUNC> allParsers;
+		std::vector<PARSE_FUNC> allOnlineParsers;
 
 		Aris::Core::CONN server;
 		std::string ip,port;
@@ -98,6 +109,7 @@ namespace Robots
 #ifdef PLATFORM_IS_LINUX
 		Aris::RT_CONTROL::ACTUATION cs;
 #endif
+
 	};
 
 }

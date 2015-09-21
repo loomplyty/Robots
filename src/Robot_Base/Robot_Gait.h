@@ -10,8 +10,8 @@
 namespace Robots
 {
 	class ROBOT_BASE;
-	
-	struct GAIT_PARAM_BASE
+
+	struct GAIT_PARAM_BASE //generated every cycle
 	{
 		std::int32_t cmdType{0};
 		std::int32_t cmdID{0};
@@ -24,7 +24,11 @@ namespace Robots
 		double beginVee[18]{0};
 		double beginBodyPE[6]{0};
 		double beginBodyVel[6]{0};
+        //double modelForcein[18]{0};
+        //double actualForcein[18]{0};
+
 		const Aris::RT_CONTROL::CMachineData *pActuationData{nullptr};
+
 	};
 
 	struct WALK_PARAM :public GAIT_PARAM_BASE
