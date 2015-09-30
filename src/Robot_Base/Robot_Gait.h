@@ -26,12 +26,33 @@ namespace Robots
 		double beginVee[18]{0};
 		double beginBodyPE[6]{0};
 		double beginBodyVel[6]{0};
-        //double modelForcein[18]{0};
-        //double actualForcein[18]{0};
+        Aris::RT_CONTROL::EOperationMode actuationMode{Aris::RT_CONTROL::OM_CYCLICVEL};
+
+        double modelForcein[18]{0};
+        double modelFrictionin[18]{0};
+        double actualForcein[18]{0};
+        double modelAccee[18]{0};
+        double modelVelee[18]{0};
+
 
 		const Aris::RT_CONTROL::CMachineData *pActuationData{nullptr};
 
 	};
+
+
+    struct FORCE_PARAM_BASE
+    {
+        double Fin_modeled[18]{0};
+        double Fin_read[18]{0};
+        double Fin_write[18]{0};
+        double Vee_desired[18]{0};
+        double Pee_desired[18]{0};
+        double Vee_filtered[18]{0};
+        double Pee_filtered[18]{0};
+        bool hasTouchedDown{0};
+
+    };
+
 
 	struct WALK_PARAM :public GAIT_PARAM_BASE
 	{
@@ -44,7 +65,8 @@ namespace Robots
 		double alpha{0};
 		double beta{0};
 	};
-	int walk(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam);
+
+    int walk(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam);
 	int walk2(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam);
 	Aris::Core::MSG parseWalk(const std::string &cmd, const std::map<std::string, std::string> &params);
 	

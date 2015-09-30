@@ -19,6 +19,7 @@ using namespace Aris::DynKer;
 
 namespace Robots
 {
+
 	int walkAcc(ROBOT_BASE * pRobot, const GAIT_PARAM_BASE * pParam)
 	{
 		/*初始化参数*/

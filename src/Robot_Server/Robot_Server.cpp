@@ -20,8 +20,7 @@ using namespace std;
 
 namespace Robots
 {
-     //const double meter2count = 1 / 0.01*3.5 * 65536;
-	class NODE
+    class NODE
 	{
 	public:
 		NODE* AddChildGroup(const char *Name);
@@ -451,12 +450,11 @@ namespace Robots
 		}
 
 		
-
-
-
 		std::string docName{ doc.RootElement()->Name() };
 
 		pRobot->LoadXml(fileName);
+        Robot_for_cal.LoadXml(fileName);
+
 
 		double pe[6]{ 0 };
 		pRobot->SetPee(homeEE, pe, "B");
@@ -521,21 +519,6 @@ namespace Robots
 		}
 	};
 
-
-/*	void ROBOT_SERVER::AddOnlineGait(std::string cmdName, GAIT_ONLINE_FUNC gaitFunc, PARSE_FUNC parseFunc)
-	{
-	 	if (mapName2ID.find(cmdName) == mapName2ID.end())
-		{
-			allOnlineGaits.push_back(gaitFunc);
-			allOnlineParsers.push_back(parseFunc);
-
-			mapName2ID.insert(std::make_pair(cmdName, allGaits.size() - 1));
-
-			std::cout << cmdName << ":" << mapName2ID.at(cmdName) << std::endl;
-
-		}
-	};
-*/
 	void ROBOT_SERVER::Start()
 	{
 #ifdef PLATFORM_IS_LINUX
@@ -543,7 +526,6 @@ namespace Robots
 
 		initParam.motorNum = 18;
 		initParam.homeMode = -1;
-        //initParam.homeTorqueLimit = 0;
         initParam.homeTorqueLimit = homeCur;
         initParam.homeHighSpeed = 280000;
 		initParam.homeLowSpeed = 160000;
@@ -555,36 +537,38 @@ namespace Robots
 		cs.SysStart();
 #endif
 
-		server.SetOnReceivedConnection([](Aris::Core::CONN *pConn, const char *pRemoteIP, int remotePort)
-		{
-			Aris::Core::log(std::string("received connection, the ip is: ") + pRemoteIP +"\n");
-			return 0;
-		});
-		server.SetOnReceiveRequest([this](Aris::Core::CONN *pConn, Aris::Core::MSG &msg)
-		{
-			Aris::Core::MSG ret;
-            this->(msg,ret);
 
-			return ret;
-		});
-		server.SetOnLoseConnection([this](Aris::Core::CONN *pConn)
-		{
-			Aris::Core::log("lost connection\n");
-			while (true)
-			{
-				try
-				{
-					pConn->StartServer(this->port.c_str());
-					break;
-				}
-				catch (Aris::Core::CONN::START_SERVER_ERROR &e)
-				{
-					std::cout << e.what() << std::endl << "will restart in 5s" << std::endl;
+
+        server.SetOnReceivedConnection([](Aris::Core::CONN *pConn, const char *pRemoteIP, int remotePort)
+        {
+            Aris::Core::log(std::string("received connection, the ip is: ") + pRemoteIP +"\n");
+            return 0;
+        });
+        server.SetOnReceiveRequest([this](Aris::Core::CONN *pConn, Aris::Core::MSG &msg)
+        {
+            Aris::Core::MSG ret;
+            this->ExecuteMsg(msg,ret);
+
+            return ret;
+        });
+        server.SetOnLoseConnection([this](Aris::Core::CONN *pConn)
+        {
+            Aris::Core::log("lost connection\n");
+            while (true)
+            {
+                try
+                {
+                    pConn->StartServer(this->port.c_str());
+                    break;
+                }
+                catch (Aris::Core::CONN::START_SERVER_ERROR &e)
+                {
+                    std::cout << e.what() << std::endl << "will restart in 5s" << std::endl;
 #ifdef PLATFORM_IS_LINUX
-					usleep(5000000);
+                    usleep(5000000);
 #endif
-				}
-			}
+                }
+            }
 
 			return 0;
 		});
@@ -619,8 +603,6 @@ namespace Robots
 			retError.Copy(e.what());
 			return;
 		}
-
-
 
 		Aris::Core::MSG cmdMsg;
 		GenerateCmdMsg(cmd, params, cmdMsg);
@@ -1075,7 +1057,7 @@ namespace Robots
 
 		return 0;
 	}
-	int ROBOT_SERVER::runGait(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data)
+    int ROBOT_SERVER::runGait(Robots::ROBOT_BASE *pRobot, Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data)
 	{
 
 		int ret = 0;
@@ -1108,25 +1090,42 @@ namespace Robots
 				pRobot->pLegs[i]->SetPee(pEE_B + i * 3, "B");
 			}
 		}
+
         //force verification
-        Robots::ROBOT_III* robotIII=dynamic_cast<Robots::ROBOT_III*>(pRobot);
-
-        //need set already pos and vel in rungait functions, so that here we can use fastdyn
-        robotIII->FastDyn();
-        robotIII->SetFixedFeet("000000");
-        //robotIII.setactivemotion("01010100")//18
-    //    Robots::ROBOT_III::FastDyn();
-
-
-      /*  static double fIN[18]{0},model_fIN[18]{0};
-        for(int i=0;i<18;i++)
+      /* if (pParam->cmdID==3)
         {
-            fIN[i]=pParam->pActuationData->feedbackData[i].Torque*Robots::current2torque;
-            pRobot
-            model_fIN[]
+            double fIn[18];
+           pRobot->GetAee(pParam->modelAccee);
+           pRobot->GetVee(pParam->modelVelee);
 
+            Robots::ROBOT_III* robotIII=dynamic_cast<Robots::ROBOT_III*>(pRobot);
+            robotIII->SetFixFeet("101010");
+            robotIII->SetActiveMotion("011111011111011111");
+            robotIII->FastDyn();
+            robotIII->GetFinDyn(pParam->modelForcein);
+            robotIII->GetFinFrc(pParam->modelFrictionin);
+            robotIII->GetFin(fIn);
+              if(pParam->count%300==0)
+            {
+                rt_printf("model dyn plus fric %f %f %f\n",pParam->modelForcein[15]+pParam->modelFrictionin[15],pParam->modelForcein[16]+pParam->modelFrictionin[16],pParam->modelForcein[17]+pParam->modelFrictionin[17]);
+                rt_printf("model fin %f %f %f\n",fIn[15],fIn[16],fIn[17]);
+
+            }
+
+
+           for(int i=0;i<pParam->motorNum;i++)
+           {
+                pParam->actualForcein[pParam->motorID[i]]=data.feedbackData[id[i]].Torque*Robots::current2force;
+
+                //need filtering
+           }
 
         }*/
+
+        //need set already pos and vel in rungait functions, so that here we can use fastdyn
+
+
+
 
 /*************************torque mode***********************/
 
@@ -1134,10 +1133,111 @@ namespace Robots
 
 		return ret;
 	}
+    int ROBOT_SERVER::LegImpedance(ROBOT_BASE *pRobot,const int legID,const int count,FORCE_PARAM_BASE *pForce, const Aris::RT_CONTROL::CMachineData & pData)
+    {
 
-	int ROBOT_SERVER::execute_cmd(int count, char *cmd, Aris::RT_CONTROL::CMachineData &data)
+        // get modeled fin_dyn+fin_frc
+       /* Robots::ROBOT_III* robotIII=dynamic_cast<Robots::ROBOT_III*>(pRobot);
+        robotIII->SetFixFeet("000000");
+        //robotIII->SetActiveMotion("111111011111111111");
+        robotIII->FastDyn();
+        robotIII->GetFin(pForce->Fin_modeled);*/
+
+        // get initial raw motion data and filter data
+        double Vin_actual[18], Pin_actual[18],Vin_filtered[18],Pin_filtered[18];
+
+
+        for(int i=1;i<18;i++)
+        {
+            int driverID;
+            a2p(&i,&driverID, 1);
+            Pin_actual[i]=pData.feedbackData[driverID].Position/Robots::meter2count;
+            Vin_actual[i]=pData.feedbackData[driverID].Velocity/Robots::meter2count;//count/s ???
+            pForce->Fin_read[i]=pData.feedbackData[driverID].Torque*Robots::current2force;
+
+
+
+            if(count==0)
+            {
+                for(int j=0;j<40;j++)
+                {
+                    vin_filter[i].FeedData(Vin_actual[i]);
+                    pin_filter[i].FeedData(Pin_actual[i]);
+                }
+
+            }
+            vin_filter[i].Filter(Vin_actual[i],Vin_filtered[i]);
+            pin_filter[i].Filter(Pin_actual[i],Pin_filtered[i]);
+
+        }
+
+        Robot_for_cal.SetPin(Pin_filtered);
+        Robot_for_cal.SetVin(Vin_filtered);
+        Robot_for_cal.GetPee(pForce->Pee_filtered);
+        Robot_for_cal.GetVee(pForce->Vee_filtered);
+
+
+         if(count%100==0)
+        {
+            rt_printf("pin actual %f %f %f \n",Pin_actual[15],Pin_actual[16],Pin_actual[17]);
+            rt_printf("pin actual %f, pin filtered %f ,vin_actual %f,vin_filtered %f \n",  Pin_actual[15],Pin_filtered[15],Vin_actual[15],Vin_filtered[15]);
+
+            rt_printf("pee_filered %f %f %f\n",pForce->Pee_filtered[15],pForce->Pee_filtered[16],pForce->Pee_filtered[17]);
+        }
+
+
+
+        //get ideal gait motion from pRobot
+        double Ain_desired[18];
+
+        pRobot->GetAin(Ain_desired);
+        pRobot->GetVee(pForce->Vee_desired);
+        pRobot->GetPee(pForce->Pee_desired);
+
+
+       //if(count%100==0)
+         //   rt_printf("pee actual %f, pee_desireed %f ,vee_actual_filtered %f , vee_desired %f \n",pForce->Pee_filtered[15],pForce->Pee_desired[15],pForce->Vee_filtered[15],pForce->Vee_desired[15]);
+
+        // compute impedance Ain_control, thus impedance force_control
+
+        double Ain_control[18];
+        double Jfd[3][3], Jfd_transpose[3][3] ;
+        pRobot->pLegs[legID]->GetJfd(*Jfd);
+        Aris::DynKer::s_transpose(3,3,*Jfd,3,*Jfd_transpose,3);
+        static double Kd[3],Kp[3];
+
+        //Aris::DynKer::s_dgemm()
+
+
+       for(int i=0;i<3;i++)
+        {
+            Ain_control[legID*3+i] =Jfd_transpose[i][0]*(Kd[0]*(pForce->Vee_desired[legID*3+0]- pForce->Vee_filtered[legID*3+0])+Kp[0]*(pForce->Pee_desired[legID*3+0]-pForce->Pee_filtered[legID*3+0]))+
+                                    Jfd_transpose[i][1]*(Kd[1]*(pForce->Vee_desired[legID*3+1]- pForce->Vee_filtered[legID*3+1])+Kp[1]*(pForce->Pee_desired[legID*3+1]-pForce->Pee_filtered[legID*3+1]))+
+                                    Jfd_transpose[i][2]*(Kd[2]*(pForce->Vee_desired[legID*3+2]- pForce->Vee_filtered[legID*3+2])+Kp[2]*(pForce->Pee_desired[legID*3+2]-pForce->Pee_filtered[legID*3+2]))+
+                                    Ain_desired[legID*3+i];
+        }
+
+
+
+
+         // need a definition of fixed leggs and swing leggs
+
+         // Robot_for_cal.SetPee(pForce->Pee_filtered);
+         // Robot_for_cal.SetVee(pForce->Vee_filtered);
+          Robot_for_cal.SetAin(Ain_control);
+          Robot_for_cal.SetFixFeet("000000");
+         // Robot_for_cal.SetActiveMotion("111111111111111111");
+          Robot_for_cal.FastDyn();
+          Robot_for_cal.GetFin(pForce->Fin_write);
+
+        return 1;
+    }
+
+
+    int ROBOT_SERVER::execute_cmd(int count, char *cmd, Aris::RT_CONTROL::CMachineData &data,Aris::Core::RT_MSG &msgSend)
 	{
         static double pBody[6]{ 0 }, vBody[6]{ 0 }, pEE[18]{ 0 }, vEE[18]{ 0 };
+        static FORCE_PARAM_BASE pForce;
 
 		int ret;
 
@@ -1165,8 +1265,38 @@ namespace Robots
 		case RESET_ORIGIN:
 			ret = resetOrigin(pRobot.get(), pParam, data);
 			break;
-		case RUN_GAIT:
+        case RUN_GAIT:
             ret = runGait(pRobot.get(), pParam, data);
+             if(pParam->actuationMode==Aris::RT_CONTROL::OM_CYCLICTORQ)
+            {
+                 if(pParam->count%1==0)
+                 {
+                     for(int i=0;i<pParam->legNum;i++)
+                        this->LegImpedance(pRobot.get(),pParam->legID[i],pParam->count,&pForce,data);
+
+                     msgSend.CopyStruct(pForce);
+                     msgSend.CopyAt(&pParam->count,sizeof(int),sizeof(pForce));
+                     msgSend.SetMsgID(1111);
+                     this->cs.RT_PostMsg(msgSend);
+                 }
+
+
+            }
+
+          /*  if(pParam->cmdID==3)//&&pParam->count%1==0)
+            {
+                msgSend.CopyStruct(pForce);
+                msgSend.CopyAt(&pParam->count,sizeof(int),sizeof(pForce));
+
+                msgSend.CopyAt(pParam->modelForcein,sizeof(double)*18,0);
+                msgSend.CopyAt(pParam->modelFrictionin,sizeof(double)*18,sizeof(double)*18);
+                msgSend.CopyAt(pParam->actualForcein,sizeof(double)*18,sizeof(double)*36);
+                msgSend.CopyAt(pParam->modelAccee,sizeof(double)*18,sizeof(double)*54);
+                msgSend.CopyAt(pParam->modelVelee,sizeof(double)*18,sizeof(double)*72);
+                msgSend.CopyAt(&pParam->count,sizeof(int),sizeof(double)*90);
+
+
+            }*/
 			break;
 		default:
 			rt_printf("unknown cmd type\n");
@@ -1228,7 +1358,7 @@ namespace Robots
 
 		if (cmdNum>0)
 		{
-			if (Robots::ROBOT_SERVER::GetInstance()->execute_cmd(count, cmdQueue[currentCmd], cmdData) == 0)///cmdData should be data
+            if (Robots::ROBOT_SERVER::GetInstance()->execute_cmd(count, cmdQueue[currentCmd], cmdData,sendMsg) == 0)///cmdData should be data
 			{
 				count = 0;
 				currentCmd = (currentCmd + 1) % 10;
@@ -1306,6 +1436,9 @@ namespace Robots
 			lastStateData = stateData;
 			lastCmdData = cmdData;
 		}
+
+
+
 
 
 		
