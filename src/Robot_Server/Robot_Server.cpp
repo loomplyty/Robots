@@ -1,4 +1,4 @@
-﻿#include <Platform.h>
+#include <Platform.h>
 #ifdef PLATFORM_IS_WINDOWS
 #define rt_printf printf
 #define _SCL_SECURE_NO_WARNINGS
@@ -1057,82 +1057,7 @@ namespace Robots
 
 		return 0;
 	}
-    int ROBOT_SERVER::runGait(Robots::ROBOT_BASE *pRobot, Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data)
-	{
 
-		int ret = 0;
-		double pIn[18], pEE_B[18];
-		pRobot->TransformCoordinatePee(pParam->beginBodyPE, "G", pParam->beginPee, "B", pEE_B);
-
-        ret = this->allGaits.at(pParam->cmdID).operator()(pRobot,pParam); //pRobot legs and body altered
-
-        pRobot->GetPin(pIn);
-
-/********************position mode *************/
-        //position mode,writing down positions to machinedata
-
-
-		int id[18];
-		a2p(pParam->motorID, id, pParam->motorNum);
-
-		/*向下写入输入位置*/
-		for (int i = 0; i<pParam->motorNum; ++i)
-		{
-			data.motorsCommands[id[i]] = Aris::RT_CONTROL::EMCMD_RUNNING;
-			data.commandData[id[i]].Position = static_cast<int>(pIn[pParam->motorID[i]] * meter2count);
-		}
-
-		/*寻找不运动的腿，并将其设到初始位置*/
-		for (int i = 0; i<6; ++i)
-		{
-			if ((std::find(pParam->legID, pParam->legID + pParam->legNum, i)) == (pParam->legID + pParam->legNum))
-			{
-				pRobot->pLegs[i]->SetPee(pEE_B + i * 3, "B");
-			}
-		}
-
-        //force verification
-      /* if (pParam->cmdID==3)
-        {
-            double fIn[18];
-           pRobot->GetAee(pParam->modelAccee);
-           pRobot->GetVee(pParam->modelVelee);
-
-            Robots::ROBOT_III* robotIII=dynamic_cast<Robots::ROBOT_III*>(pRobot);
-            robotIII->SetFixFeet("101010");
-            robotIII->SetActiveMotion("011111011111011111");
-            robotIII->FastDyn();
-            robotIII->GetFinDyn(pParam->modelForcein);
-            robotIII->GetFinFrc(pParam->modelFrictionin);
-            robotIII->GetFin(fIn);
-              if(pParam->count%300==0)
-            {
-                rt_printf("model dyn plus fric %f %f %f\n",pParam->modelForcein[15]+pParam->modelFrictionin[15],pParam->modelForcein[16]+pParam->modelFrictionin[16],pParam->modelForcein[17]+pParam->modelFrictionin[17]);
-                rt_printf("model fin %f %f %f\n",fIn[15],fIn[16],fIn[17]);
-
-            }
-
-
-           for(int i=0;i<pParam->motorNum;i++)
-           {
-                pParam->actualForcein[pParam->motorID[i]]=data.feedbackData[id[i]].Torque*Robots::current2force;
-
-                //need filtering
-           }
-
-        }*/
-
-        //need set already pos and vel in rungait functions, so that here we can use fastdyn
-
-
-
-
-/*************************torque mode***********************/
-
-
-
-		return ret;
-	}
     int ROBOT_SERVER::LegImpedance(ROBOT_BASE *pRobot,const int legID,const int count,FORCE_PARAM_BASE *pForce, const Aris::RT_CONTROL::CMachineData & pData)
     {
 
@@ -1163,11 +1088,13 @@ namespace Robots
                 {
                     vin_filter[i].FeedData(Vin_actual[i]);
                     pin_filter[i].FeedData(Pin_actual[i]);
+                    fin_filter[i].FeedData(pForce->Fin_read[i]);
                 }
 
             }
             vin_filter[i].Filter(Vin_actual[i],Vin_filtered[i]);
             pin_filter[i].Filter(Pin_actual[i],Pin_filtered[i]);
+            fin_filter[i].Filter(pForce->Fin_read[i],pForce->Fin_read_filtered[i]);
 
         }
 
@@ -1233,11 +1160,332 @@ namespace Robots
         return 1;
     }
 
+    int ROBOT_SERVER::ImpedanceAlgorithm(ROBOT_BASE *pRobot, const int count,FORCE_PARAM_BASE *pForce, const Aris::RT_CONTROL::CMachineData & pData)
+    {
+
+         // get modeled fin_dyn+fin_frc
+        Robots::ROBOT_III* robotIII=dynamic_cast<Robots::ROBOT_III*>(pRobot);
+        robotIII->SetFixFeet("000000");
+        //robotIII->SetActiveMotion("111111011111111111");
+        robotIII->FastDyn();
+        robotIII->GetFin(pForce->Fin_modeled);
+
+        // get initial raw motion data and filter data
+        double Vin_actual[18], Pin_actual[18],Vin_filtered[18],Pin_filtered[18];
+
+
+        for(int i=1;i<18;i++)
+        {
+            int driverID;
+            a2p(&i,&driverID, 1);
+            Pin_actual[i]=pData.feedbackData[driverID].Position/Robots::meter2count;
+            Vin_actual[i]=pData.feedbackData[driverID].Velocity/Robots::meter2count;//count/s ???
+            pForce->Fin_read[i]=pData.feedbackData[driverID].Torque*Robots::current2force;
+
+
+
+            if(count==0)
+            {
+                for(int j=0;j<40;j++)
+                {
+                    vin_filter[i].FeedData(Vin_actual[i]);
+                    pin_filter[i].FeedData(Pin_actual[i]);
+                    fin_filter[i].FeedData(pForce->Fin_read[i]);
+                }
+
+            }
+
+
+            vin_filter[i].Filter(Vin_actual[i],Vin_filtered[i]);
+            pin_filter[i].Filter(Pin_actual[i],Pin_filtered[i]);
+            fin_filter[i].Filter(pForce->Fin_read[i],pForce->Fin_read_filtered[i]);
+
+        }
+
+        Robot_for_cal.SetPin(Pin_filtered);
+        Robot_for_cal.SetVin(Vin_filtered);
+        Robot_for_cal.GetPee(pForce->Pee_filtered);
+        Robot_for_cal.GetVee(pForce->Vee_filtered);
+
+
+         if(count%100==0)
+        {
+            rt_printf("pin actual %f %f %f \n",Pin_actual[15],Pin_actual[16],Pin_actual[17]);
+            rt_printf("pin actual %f, pin filtered %f ,vin_actual %f,vin_filtered %f \n",  Pin_actual[15],Pin_filtered[15],Vin_actual[15],Vin_filtered[15]);
+
+            rt_printf("pee_filered %f %f %f\n",pForce->Pee_filtered[15],pForce->Pee_filtered[16],pForce->Pee_filtered[17]);
+        }
+
+
+
+        //get ideal gait motion from pRobot
+        double Ain_desired[18];
+
+        pRobot->GetAin(Ain_desired);
+        pRobot->GetVee(pForce->Vee_desired);
+        pRobot->GetPee(pForce->Pee_desired);
+
+
+       //if(count%100==0)
+         //   rt_printf("pee actual %f, pee_desireed %f ,vee_actual_filtered %f , vee_desired %f \n",pForce->Pee_filtered[15],pForce->Pee_desired[15],pForce->Vee_filtered[15],pForce->Vee_desired[15]);
+
+        // compute impedance Ain_control, thus impedance force_control
+
+        double Ain_control[18];
+        double Jfd[3][3], Jfd_transpose[3][3];
+        for(int legID;legID<6;legID++)
+        {
+            pRobot->pLegs[legID]->GetJfd(*Jfd);
+            Aris::DynKer::s_transpose(3,3,*Jfd,3,*Jfd_transpose,3);
+
+            //Aris::DynKer::s_dgemm()
+
+
+           for(int i=0;i<3;i++)
+            {
+                Ain_control[legID*3+i] =Jfd_transpose[i][0]*(pForce->Kd[legID*3+0]*(pForce->Vee_desired[legID*3+0]- pForce->Vee_filtered[legID*3+0])+pForce->Kp[legID*3+0]*(pForce->Pee_desired[legID*3+0]-pForce->Pee_filtered[legID*3+0]))+
+                                        Jfd_transpose[i][1]*(pForce->Kd[legID*3+1]*(pForce->Vee_desired[legID*3+1]- pForce->Vee_filtered[legID*3+1])+pForce->Kp[legID*3+1]*(pForce->Pee_desired[legID*3+1]-pForce->Pee_filtered[legID*3+1]))+
+                                        Jfd_transpose[i][2]*(pForce->Kd[legID*3+2]*(pForce->Vee_desired[legID*3+2]- pForce->Vee_filtered[legID*3+2])+pForce->Kp[legID*3+2]*(pForce->Pee_desired[legID*3+2]-pForce->Pee_filtered[legID*3+2]))+
+                                        Ain_desired[legID*3+i];
+                pForce->Fee_ext[legID*3+i]=Jfd[i][0]*(pForce->Fin_read_filtered[legID*3+0]-pForce->Fin_modeled[legID*3+0])+
+                                           Jfd[i][1]*(pForce->Fin_read_filtered[legID*3+1]-pForce->Fin_modeled[legID*3+1])+
+                                           Jfd[i][2]*(pForce->Fin_read_filtered[legID*3+2]-pForce->Fin_modeled[legID*3+2]);
+            }
+        }
+
+         // need a definition of fixed leggs and swing leggs
+
+         // Robot_for_cal.SetPee(pForce->Pee_filtered);
+         // Robot_for_cal.SetVee(pForce->Vee_filtered);
+          Robot_for_cal.SetAin(Ain_control);
+          Robot_for_cal.SetFixFeet("000000");
+         // Robot_for_cal.SetActiveMotion("111111111111111111");
+          Robot_for_cal.FastDyn();
+          Robot_for_cal.GetFin(pForce->Fin_write);
+
+        return 1;
+
+    }
+
+
+
+    static const int LegsBeside[6][2]{{1,3},{0,2},{1,5},{2,4},{3,5},{0,4}};
+    static const int LegsInPair[6][2]{{2,4},{3,5},{0,4},{1,5},{0,2},{1,3}};
+
+
+    int ROBOT_SERVER::LegStateAndTransition(FORCE_PARAM_BASE *pForce,const Aris::RT_CONTROL::CMachineData & pData)
+    {
+
+        for(int i=0;i<6;i++)
+        {
+            switch(pForce->LegState[i])
+            {
+            case SWING:
+                //GIVE THE SWING TRAJ
+                if(pForce->Fee_ext[i*3+1]>pForce->Force_threshold)
+                {
+                    pForce->LegState[i]=TOUCHDOWN;
+                    //increase Kp//pForce->Kp[i*3];
+                    //pForce->Kp[i*3+1]++;
+                    //pForce->Kp[i*3+2]++
+
+
+                    if(pForce->LegState[LegsInPair[i][1]]==SUPPORT&&pForce->LegState[LegsInPair[i][2]]==SUPPORT)
+                    {
+                        pForce->RobotEvent=Robots::ROBOTEVENT::TOUCHDOWN_LEG3;
+                    }
+                    else if(pForce->LegState[LegsInPair[i][1]]!=SUPPORT&&pForce->LegState[LegsInPair[i][2]]!=SUPPORT)
+                    {
+                        pForce->RobotEvent=Robots::ROBOTEVENT::TOUCHDOWN_LEG1;
+                    }
+                    else
+                    {
+                        pForce->RobotEvent=Robots::ROBOTEVENT::TOUCHDOWN_LEG2;
+                    }
+
+                    pForce->eventLegID=i;
+
+                }
+
+             case TOUCHDOWN:
+                 //if(Kp == a certain level)
+                {
+                   // if(Vee_filtered<)
+                        pForce->LegState[i]=SUPPORT;
+                        if(pForce->LegState[LegsInPair[i][1]]==SUPPORT&&pForce->LegState[LegsInPair[i][2]]==SUPPORT)
+                        {
+                            pForce->RobotEvent=Robots::ROBOTEVENT::SUPPORT_LEG3;
+                        }
+                        else if(pForce->LegState[LegsInPair[i][1]]!=SUPPORT&&pForce->LegState[LegsInPair[i][2]]!=SUPPORT)
+                        {
+                            pForce->RobotEvent=Robots::ROBOTEVENT::SUPPORT_LEG1;
+                        }
+                        else
+                        {
+                            pForce->RobotEvent=Robots::ROBOTEVENT::SUPPORT_LEG2;
+                        }
+
+                        pForce->eventLegID=i;
+
+                }
+
+
+                //1. increase Kp to a certain level
+                //2. change the pee_desired position to make the robot thrust forward
+                //pForce->Pee_desired
+
+            case SUPPORT://DO NOTHING, WAIT STATE TRANSITION
+
+            case LIFTOFF:
+                //1. decreas gains
+                //pee-desired stays in contact with th ground
+
+            default:
+                ;
+            }
+
+        }
+
+
+        RobotStateMachine(pForce);
+
+        return 0;
+
+
+    }
+    int ROBOT_SERVER::RobotStateMachine(FORCE_PARAM_BASE *pForce)
+    {
+          switch(pForce->RobotState)
+        {
+        case Robots::ROBOTSTATE::INIT:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::BEGIN)
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE1;
+            break;
+        case Robots::ROBOTSTATE::PHASE1:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::TOUCHDOWN_LEG1)
+            {
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE2;
+                pForce->LegState[LegsBeside[pForce->eventLegID][1]]=Robots::LEGSTATE::LIFTOFF;
+                pForce->LegState[LegsBeside[pForce->eventLegID][2]]=Robots::LEGSTATE::LIFTOFF;
+            }
+            break;
+        case Robots::ROBOTSTATE::PHASE2:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::SUPPORT_LEG1)
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE3;
+            break;
+        case Robots::ROBOTSTATE::PHASE3:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::TOUCHDOWN_LEG2)
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE4;
+            break;
+        case Robots::ROBOTSTATE::PHASE4:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::SUPPORT_LEG2)
+            {
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE5;
+                if(pForce->LegState[LegsBeside[pForce->eventLegID][1]]==Robots::LEGSTATE::LIFTOFF)
+                    pForce->LegState[LegsBeside[pForce->eventLegID][2]]=Robots::LEGSTATE::LIFTOFF;
+                else
+                    pForce->LegState[LegsBeside[pForce->eventLegID][1]]=Robots::LEGSTATE::LIFTOFF;
+            }
+            break;
+        case Robots::ROBOTSTATE::PHASE5:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::TOUCHDOWN_LEG3)
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE6;
+            break;
+        case Robots::ROBOTSTATE::PHASE6:
+            if(pForce->RobotEvent==Robots::ROBOTEVENT::SUPPORT_LEG3)
+            {
+                pForce->RobotState=Robots::ROBOTSTATE::PHASE1;
+                pForce->LegState[LegsBeside[pForce->eventLegID][1]]==Robots::LEGSTATE::SWING;
+                pForce->LegState[LegsInPair[LegsBeside[pForce->eventLegID][1]][1]]==Robots::LEGSTATE::SWING;
+                pForce->LegState[LegsBeside[LegsBeside[pForce->eventLegID][1]][2]]==Robots::LEGSTATE::SWING;
+
+            }
+            else if(pForce->RobotEvent==Robots::ROBOTEVENT::END)
+                pForce->RobotState=Robots::ROBOTSTATE::INIT;
+            break;
+
+        defualt:
+            break;
+        }
+
+        return static_cast<int>(pForce->RobotState);
+    }
+
+
+    int ROBOT_SERVER::runGait(Robots::ROBOT_BASE *pRobot, Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data)
+	{
+
+        int ret = 0;
+
+        int id[18];
+        a2p(pParam->motorID, id, pParam->motorNum);
+
+        if(pParam->actuationMode==Aris::RT_CONTROL::OM_CYCLICTORQ)
+            //need set already pos and vel in rungait functions, so that here we can use fastdyn
+
+        {
+            static FORCE_PARAM_BASE Force_param;
+            static int force_count;
+
+            /*switch leg state and robot state,varying Kp,Kd and desired motion pos/vel*/
+            if(force_count==0)
+                Force_param.RobotEvent=Robots::ROBOTEVENT::BEGIN;
+            this->LegStateAndTransition(&Force_param,data);
+            //force_count variation.
+
+            /*get a desired position from the gait*/
+             //pParam->count=force_count;
+             this->allGaits.at(pParam->cmdID).operator()(pRobot,pParam);
+
+
+             /*use current motion, desired motion and gain params to get a force input*/
+            // this->ImpedanceAlgorithm();
+
+            /*write force to drivers*/
+            for(int i=0;i<18;i++)
+                            //for (int i = 0; i<pParam->motorNum; ++i)
+            {
+                data.motorsModes[id[i]]=Aris::RT_CONTROL::EOperationMode::OM_CYCLICTORQ;
+                data.commandData[id[i]].Torque=static_cast<int>(Force_param.Fin_write[i]/Robots::current2force);
+            }
+
+        }
+        else
+        {
+            /********************position mode *************/
+            //position mode,writing down positions to machinedata
+            double pIn[18], pEE_B[18];
+            pRobot->TransformCoordinatePee(pParam->beginBodyPE, "G", pParam->beginPee, "B", pEE_B);
+
+            ret = this->allGaits.at(pParam->cmdID).operator()(pRobot,pParam); //pRobot legs and body altered
+
+            pRobot->GetPin(pIn);
+
+            /*向下写入输入位置*/
+            for (int i = 0; i<pParam->motorNum; ++i)
+            {
+                data.motorsCommands[id[i]] = Aris::RT_CONTROL::EMCMD_RUNNING;
+                data.commandData[id[i]].Position = static_cast<int>(pIn[pParam->motorID[i]] * meter2count);
+            }
+
+            /*寻找不运动的腿，并将其设到初始位置*/
+            for (int i = 0; i<6; ++i)
+            {
+                if ((std::find(pParam->legID, pParam->legID + pParam->legNum, i)) == (pParam->legID + pParam->legNum))
+                {
+                    pRobot->pLegs[i]->SetPee(pEE_B + i * 3, "B");
+                }
+            }
+
+        }
+
+		return ret;
+	}
 
     int ROBOT_SERVER::execute_cmd(int count, char *cmd, Aris::RT_CONTROL::CMachineData &data,Aris::Core::RT_MSG &msgSend)
 	{
         static double pBody[6]{ 0 }, vBody[6]{ 0 }, pEE[18]{ 0 }, vEE[18]{ 0 };
-        static FORCE_PARAM_BASE pForce;
+        //static FORCE_PARAM_BASE pForce;
 
 		int ret;
 
@@ -1267,7 +1515,7 @@ namespace Robots
 			break;
         case RUN_GAIT:
             ret = runGait(pRobot.get(), pParam, data);
-             if(pParam->actuationMode==Aris::RT_CONTROL::OM_CYCLICTORQ)
+         /*    if(pParam->actuationMode==Aris::RT_CONTROL::OM_CYCLICTORQ)
             {
                  if(pParam->count%1==0)
                  {
@@ -1281,22 +1529,9 @@ namespace Robots
                  }
 
 
-            }
-
-          /*  if(pParam->cmdID==3)//&&pParam->count%1==0)
-            {
-                msgSend.CopyStruct(pForce);
-                msgSend.CopyAt(&pParam->count,sizeof(int),sizeof(pForce));
-
-                msgSend.CopyAt(pParam->modelForcein,sizeof(double)*18,0);
-                msgSend.CopyAt(pParam->modelFrictionin,sizeof(double)*18,sizeof(double)*18);
-                msgSend.CopyAt(pParam->actualForcein,sizeof(double)*18,sizeof(double)*36);
-                msgSend.CopyAt(pParam->modelAccee,sizeof(double)*18,sizeof(double)*54);
-                msgSend.CopyAt(pParam->modelVelee,sizeof(double)*18,sizeof(double)*72);
-                msgSend.CopyAt(&pParam->count,sizeof(int),sizeof(double)*90);
-
-
             }*/
+
+
 			break;
 		default:
 			rt_printf("unknown cmd type\n");

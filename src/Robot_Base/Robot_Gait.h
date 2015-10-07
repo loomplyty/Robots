@@ -40,17 +40,58 @@ namespace Robots
 	};
 
 
+    enum LEGSTATE
+    {
+        LEG_INIT=0,
+        SWING=1,
+        TOUCHDOWN=2,
+        SUPPORT=3,
+        LIFTOFF=4,
+    };
+
+    enum ROBOTSTATE
+    {
+        INIT=0,
+        PHASE1=1,
+        PHASE2=2,
+        PHASE3=3,
+        PHASE4=4,
+        PHASE5=5,
+        PHASE6=6,
+        FINISHED=7,
+     };
+
+    enum ROBOTEVENT
+    {
+        NONE=-1,
+        BEGIN=0,
+        TOUCHDOWN_LEG1=1,
+        SUPPORT_LEG1=2,
+        TOUCHDOWN_LEG2=3,
+        SUPPORT_LEG2=4,
+        TOUCHDOWN_LEG3=5,
+        SUPPORT_LEG3=6,
+        END=7,
+    };
+
     struct FORCE_PARAM_BASE
     {
         double Fin_modeled[18]{0};
         double Fin_read[18]{0};
+        double Fin_read_filtered[18]{0};
         double Fin_write[18]{0};
+        double Fee_ext[18]{0};
         double Vee_desired[18]{0};
         double Pee_desired[18]{0};
         double Vee_filtered[18]{0};
         double Pee_filtered[18]{0};
-        bool hasTouchedDown{0};
-
+        LEGSTATE LegState[6]{Robots::LEGSTATE::LEG_INIT};
+        ROBOTSTATE RobotState{Robots::ROBOTSTATE::INIT};
+        ROBOTEVENT RobotEvent{Robots::ROBOTEVENT::NONE};
+        int eventLegID{0};
+        double Force_threshold{0};
+        double Kp[18];
+        double Kd[18];
     };
 
 

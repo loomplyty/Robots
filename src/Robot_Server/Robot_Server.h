@@ -232,9 +232,14 @@ public:
 		int enable(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *param, Aris::RT_CONTROL::CMachineData &data);
 		int disable(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *param, Aris::RT_CONTROL::CMachineData &data);
 		int resetOrigin(Robots::ROBOT_BASE *pRobot, const Robots::GAIT_PARAM_BASE *param, Aris::RT_CONTROL::CMachineData &data);
-        int runGait(Robots::ROBOT_BASE *pRobot,   Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data);
+        int runGait(Robots::ROBOT_BASE *pRobot,  Robots::GAIT_PARAM_BASE *pParam, Aris::RT_CONTROL::CMachineData &data);
 
         int LegImpedance(ROBOT_BASE *pRobot,const int LegID,const int count,FORCE_PARAM_BASE *pForce, const Aris::RT_CONTROL::CMachineData & pData);
+        int ImpedanceAlgorithm(ROBOT_BASE *pRobot,const int count,FORCE_PARAM_BASE *pForce, const Aris::RT_CONTROL::CMachineData & pData);
+
+        int LegStateAndTransition(FORCE_PARAM_BASE *pForce,const Aris::RT_CONTROL::CMachineData & pData);
+
+        int RobotStateMachine(FORCE_PARAM_BASE *pForce);
 
         int execute_cmd(int count, char *cmd, Aris::RT_CONTROL::CMachineData &data,Aris::Core::RT_MSG& msgSend);
 		static int tg(Aris::RT_CONTROL::CMachineData &data, Aris::Core::RT_MSG &recvMsg, Aris::Core::RT_MSG &sendMsg);
@@ -244,6 +249,7 @@ public:
         Robots::ROBOT_III Robot_for_cal;
         Robots::Filter::CFilterFIR_I vin_filter[18];
         Robots::Filter::CFilterFIR_I pin_filter[18];
+        Robots::Filter::CFilterFIR_I fin_filter[18];
 
 		std::map<std::string, int> mapName2ID;
 		std::vector<GAIT_FUNC> allGaits;
