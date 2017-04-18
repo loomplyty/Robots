@@ -29,7 +29,8 @@ namespace Robots
 			if (i.first == "all")
 			{
 				std::fill_n(param.active_motor, 18, true);
-				std::fill_n(param.active_leg, 6, true);
+                std::fill_n(param.active_leg, 6, true);
+
 			}
 			else if (i.first == "first")
 			{
@@ -37,7 +38,7 @@ namespace Robots
 				std::fill_n(param.active_motor + 0, 3, true);
 				std::fill_n(param.active_motor + 6, 3, true);
 				std::fill_n(param.active_motor + 12, 3, true);
-				param.active_leg[0] = true;
+                param.active_leg[0] = true;
 				param.active_leg[2] = true;
 				param.active_leg[4] = true;
 				param.active_leg[1] = false;
@@ -52,12 +53,13 @@ namespace Robots
 				std::fill_n(param.active_motor + 3, 3, true);
 				std::fill_n(param.active_motor + 9, 3, true);
 				std::fill_n(param.active_motor + 15, 3, true);
-				param.active_leg[1] = true;
+                param.active_leg[1] = true;
 				param.active_leg[3] = true;
 				param.active_leg[5] = true;
 				param.active_leg[0] = false;
 				param.active_leg[2] = false;
 				param.active_leg[4] = false;
+
 			}
 			else if (i.first == "motor")
 			{
@@ -66,7 +68,8 @@ namespace Robots
 				
 				std::fill_n(param.active_motor, 18, false);
 				param.active_motor[id] = true;
-				std::fill(param.active_leg, param.active_leg + 6, false);
+                std::fill(param.active_leg, param.active_leg + 6, false);
+
 			}
 			else if (i.first == "physical_motor")
 			{
@@ -75,7 +78,8 @@ namespace Robots
 				
 				std::fill_n(param.active_motor, 18, false);
 				param.active_motor[aris::server::ControlServer::instance().controller().motionAtPhy(id).absID()] = true;
-				std::fill(param.active_leg, param.active_leg + 6, false);
+                std::fill(param.active_leg, param.active_leg + 6, false);
+
 			}
 			else if (i.first == "leg")
 			{
@@ -84,8 +88,9 @@ namespace Robots
 
 				std::fill_n(param.active_motor, 18, false);
 				std::fill_n(param.active_motor + leg_id * 3, 3, true);
-				std::fill_n(param.active_leg, 6, false);
+                std::fill_n(param.active_leg, 6, false);
 				param.active_leg[leg_id] = true;
+
 			}
 		}
 
@@ -154,10 +159,11 @@ namespace Robots
 			{
 				param.margin_offset = std::stod(i.second);
 			}
-			else if (i.first == "require_zero")
+            else if (i.first == "require_zero")
 			{
 				param.is_zeroing_required = std::stoi(i.second) == 0 ? false : true;
 			}
+
 			else
 			{
 				throw std::runtime_error("unknown param in parseRecover func");
@@ -214,10 +220,11 @@ namespace Robots
 
 					robot.pLegs[i]->SetPee(pEE);
 				}
-				if (param.is_zeroing_required && param.count == param.recover_count)
+                if (param.is_zeroing_required && param.count == param.recover_count)
 				{
 					param.ruicong_data->at(0).isZeroingRequested[i] = true;
 				}
+
 			}
 		}
 
